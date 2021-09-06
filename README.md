@@ -1,2 +1,2 @@
-# OLSR
-Base configuration for running OLSR on OpenWRT routers
+# OLSR Wireless Mesh Networking for OpenWRT
+Base configuration for running a Wireless OLSR Mesh on OpenWRT routers
