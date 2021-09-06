@@ -1,0 +1,66 @@
+#!/bin/sh
+
+# Copyright (C) 2006 OpenWrt.org
+
+iptables -F input_rule
+iptables -F output_rule
+iptables -F forwarding_rule
+iptables -t nat -F prerouting_rule
+iptables -t nat -F postrouting_rule
+
+# The following chains are for traffic directed at the IP of the
+# WAN interface
+
+iptables -F input_wan
+iptables -F forwarding_wan
+iptables -t nat -F prerouting_wan
+
+# Does anyone have a command to get the name of the WIFI interface on Kamikaze so
+# that it doesn't have to be hard-coded here?  This is a bit sloppy it seems.
+WIFI=wlan0
+LAN=eth1
+WAN=eth0
+
+iptables        -A input_wan      -p tcp --dport 22 -j ACCEPT
+
+# Allow connections to olsr info port.
+iptables        -A input_wan      -p tcp --dport 1979 -j ACCEPT
+
+# Allow WAN connections to olsr info port????
+iptables        -A input_rule -i $WIFI      -p tcp --dport 1979 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables        -A output_rule -o $WIFI     -p tcp --sport 1979 -m state --state ESTABLISHED -j ACCEPT
+iptables        -A output_rule -o $WIFI     -p tcp --dport 1979 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables        -A input_rule -i $WIFI      -p tcp --sport 1979 -m state --state ESTABLISHED -j ACCEPT
+
+# OLSR needs port 698 to transmit state messages.
+iptables -A input_rule -p udp --dport 698 -j ACCEPT
+
+
+# Debugging... do we have WIFI, LAN and WAN appropriately defined?
+# These values are passed to us from /etc/init.d/firewall, which
+# calls this script.
+
+# echo WIFI == $WIFI
+# echo LAN == $LAN
+# echo WAN == $WAN
+
+iptables -A forwarding_rule -i $WAN -o $WIFI -j ACCEPT
+
+iptables -A forwarding_rule -i $WIFI -o $WAN -j ACCEPT
+
+# For forwarding LAN & WIFI in nodes
+iptables -A forwarding_rule -i $LAN -o $WIFI -j ACCEPT
+
+# For WIFI clients to connect to nodes.
+iptables -A forwarding_rule -i $WIFI -o $WIFI -j ACCEPT
+
+# For connecting a wired lan client of node 1 to wired lan client of node 2
+iptables -A forwarding_rule -i $LAN -o $LAN -j ACCEPT
+
+# WIFI needs to go to LAN ports, too!
+iptables -A forwarding_rule -i $WIFI -o $LAN -j ACCEPT
+
+##### Copied from dd-wrt olsr #####
+iptables -t nat -A postrouting_rule -o $WAN -j MASQUERADE
+iptables -t nat -A postrouting_rule -o $WIFI -s 10.0.0.10/255.255.0.0 -d 10.0.0.10/255.255.0.0 -j MASQUERADE
+iptables -t nat -A postrouting_rule -o $LAN -s 10.0.10.0/255.255.255.0 -d 10.0.10.0/255.255.255.0 -j MASQUERADE
